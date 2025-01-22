@@ -202,9 +202,10 @@ public:
         }
 
         const auto end_time = std::chrono::high_resolution_clock::now();
-        const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+        const auto duration_microseconds = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
+        const auto duration_milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
 
-        std::cout << "Parsed in " << duration << "ms." << std::endl;
+        std::cout << "Parsed in " << duration_milliseconds << "ms (" << duration_microseconds << "\xE6s). " << std::endl;
     }
 
     void initialize_midi()

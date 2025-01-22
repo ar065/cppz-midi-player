@@ -229,10 +229,12 @@ public:
             throw std::runtime_error("MIDI initialization failed");
         }
 
+        // TODO: Don't use NtQuerySystemTime, use std::chrono. Also don't use NtDelayExecution, use thread sleep.
         NtQuerySystemTime = reinterpret_cast<void (*)(PLARGE_INTEGER)>(
             GetProcAddress(GetModuleHandle("ntdll.dll"), "NtQuerySystemTime"));
         NtDelayExecution = reinterpret_cast<void (*)(BOOL, PLARGE_INTEGER)>(
             GetProcAddress(GetModuleHandle("ntdll.dll"), "NtDelayExecution"));
+
         SendDirectData = reinterpret_cast<void (*)(uint32_t)>(
             GetProcAddress(midi, "SendDirectData"));
 

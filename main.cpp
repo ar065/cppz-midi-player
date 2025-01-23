@@ -104,22 +104,6 @@ public:
     }
 };
 
-// Bad
-// void delayExecution100Ns(const int64_t delayIn100Ns) {
-//     using namespace std::chrono;
-//     const auto delayDuration = duration<int64_t, std::ratio<1, 10000000>>(delayIn100Ns);
-//     std::this_thread::sleep_for(delayDuration);
-// }
-
-// void busyWait100Ns(const int64_t delayIn100Ns) {
-//     using namespace std::chrono;
-//     const auto start = high_resolution_clock::now();
-//     const auto end = start + duration<int64_t, std::ratio<1, 10000000>>(delayIn100Ns);
-//     while (high_resolution_clock::now() < end) {
-//         // Spin-wait
-//     }
-// }
-
 #if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
 

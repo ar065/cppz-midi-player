@@ -104,6 +104,64 @@ public:
     }
 };
 
+// Bad
+// void delayExecution100Ns(const int64_t delayIn100Ns) {
+//     using namespace std::chrono;
+//     const auto delayDuration = duration<int64_t, std::ratio<1, 10000000>>(delayIn100Ns);
+//     std::this_thread::sleep_for(delayDuration);
+// }
+
+// void busyWait100Ns(const int64_t delayIn100Ns) {
+//     using namespace std::chrono;
+//     const auto start = high_resolution_clock::now();
+//     const auto end = start + duration<int64_t, std::ratio<1, 10000000>>(delayIn100Ns);
+//     while (high_resolution_clock::now() < end) {
+//         // Spin-wait
+//     }
+// }
+
+#if defined(_WIN32) || defined(_WIN64)
+#include <windows.h>
+
+const auto NtQuerySystemTime = reinterpret_cast<void (*)(PLARGE_INTEGER)>(
+    GetProcAddress(GetModuleHandle("ntdll.dll"), "NtQuerySystemTime"));
+
+// Declaration of NtDelayExecution
+const auto NtDelayExecution = reinterpret_cast<void (*)(BOOL, PLARGE_INTEGER)>(
+    GetProcAddress(GetModuleHandle("ntdll.dll"), "NtDelayExecution"));
+
+void delayExecution100Ns(int64_t delayIn100Ns) {
+    LARGE_INTEGER delay;
+    delay.QuadPart = -delayIn100Ns; // Negative for relative time
+    NtDelayExecution(FALSE, &delay);
+}
+
+uint64_t get100NanosecondsSinceEpoch() {
+    LARGE_INTEGER ticker;
+    NtQuerySystemTime(&ticker);
+    return ticker.QuadPart;
+}
+
+#else
+#include <time.h>
+#include <sys/time.h>
+
+uint64_t get100NanosecondsSinceEpoch() {
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+
+    return ((uint64_t)ts.tv_sec * 10000000ULL) +
+           ((uint64_t)ts.tv_nsec / 100ULL);
+}
+
+void delayExecution100Ns(int64_t delayIn100Ns) {
+    timespec req{};
+    req.tv_sec = delayIn100Ns / 10000000;
+    req.tv_nsec = (delayIn100Ns % 10000000) * 100;
+    nanosleep(&req, nullptr);
+}
+#endif
+
 class MIDIPlayer
 {
 private:
@@ -129,8 +187,6 @@ private:
 
     HMODULE midi{};
 
-    std::function<void(PLARGE_INTEGER)> NtQuerySystemTime;
-    std::function<void(BOOL, PLARGE_INTEGER)> NtDelayExecution;
     std::function<void(uint32_t)> SendDirectData;
 
 public:
@@ -212,6 +268,7 @@ public:
     {
         midi = LoadLibrary(R"(C:\WINDOWS\system32\OmniMIDI.dll)");
         // midi = LoadLibrary(R"(C:\Users\ar06\Documents\MidiPlayers\omv2\x64\OmniMIDI.dll)");
+        // midi = LoadLibrary(R"(C:\Users\ar06\Documents\MidiPlayers\syndrv.dll)");
 
         if (!midi)
         {
@@ -229,16 +286,10 @@ public:
             throw std::runtime_error("MIDI initialization failed");
         }
 
-        // TODO: Don't use NtQuerySystemTime, use std::chrono. Also don't use NtDelayExecution, use thread sleep.
-        NtQuerySystemTime = reinterpret_cast<void (*)(PLARGE_INTEGER)>(
-            GetProcAddress(GetModuleHandle("ntdll.dll"), "NtQuerySystemTime"));
-        NtDelayExecution = reinterpret_cast<void (*)(BOOL, PLARGE_INTEGER)>(
-            GetProcAddress(GetModuleHandle("ntdll.dll"), "NtDelayExecution"));
-
         SendDirectData = reinterpret_cast<void (*)(uint32_t)>(
             GetProcAddress(midi, "SendDirectData"));
 
-        if (!SendDirectData || !NtQuerySystemTime || !NtDelayExecution)
+        if (!SendDirectData)
         {
             throw std::runtime_error("Failed to load required functions.");
         }
@@ -258,9 +309,9 @@ public:
 
     void play()
     {
-        LARGE_INTEGER ticker;
-        NtQuerySystemTime(&ticker);
-        last_time = ticker.QuadPart;
+        const auto now = get100NanosecondsSinceEpoch();
+
+        last_time = now;
         last_note_count_time = last_time;
 
         is_playing = true;
@@ -329,9 +380,9 @@ public:
 
             tick += delta_tick;
 
-            NtQuerySystemTime(&ticker);
-            temp = ticker.QuadPart - last_time;
-            last_time = ticker.QuadPart;
+            const auto now = get100NanosecondsSinceEpoch();
+            temp = now - last_time;
+            last_time = now;
             temp -= old;
             old = delta_tick * multiplier;
             delta += temp;
@@ -344,9 +395,8 @@ public:
             }
             else
             {
-                LARGE_INTEGER sleep_val;
-                sleep_val.QuadPart = -static_cast<LONGLONG>(temp);
-                NtDelayExecution(FALSE, &sleep_val);
+                // busyWait100Ns(temp);
+                delayExecution100Ns(temp);
             }
 
             // std::cout << "delta_tick: " << delta_tick << std::endl;

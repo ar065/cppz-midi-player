@@ -130,13 +130,15 @@ const auto NtQuerySystemTime = reinterpret_cast<void (*)(PLARGE_INTEGER)>(
 const auto NtDelayExecution = reinterpret_cast<void (*)(BOOL, PLARGE_INTEGER)>(
     GetProcAddress(GetModuleHandle("ntdll.dll"), "NtDelayExecution"));
 
-void delayExecution100Ns(int64_t delayIn100Ns) {
+void delayExecution100Ns(int64_t delayIn100Ns)
+{
     LARGE_INTEGER delay;
     delay.QuadPart = -delayIn100Ns; // Negative for relative time
     NtDelayExecution(FALSE, &delay);
 }
 
-uint64_t get100NanosecondsSinceEpoch() {
+uint64_t get100NanosecondsSinceEpoch()
+{
     LARGE_INTEGER ticker;
     NtQuerySystemTime(&ticker);
     return ticker.QuadPart;
@@ -146,7 +148,8 @@ uint64_t get100NanosecondsSinceEpoch() {
 #include <time.h>
 #include <sys/time.h>
 
-uint64_t get100NanosecondsSinceEpoch() {
+uint64_t get100NanosecondsSinceEpoch()
+{
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
 
@@ -154,7 +157,8 @@ uint64_t get100NanosecondsSinceEpoch() {
            ((uint64_t)ts.tv_nsec / 100ULL);
 }
 
-void delayExecution100Ns(int64_t delayIn100Ns) {
+void delayExecution100Ns(int64_t delayIn100Ns)
+{
     timespec req{};
     req.tv_sec = delayIn100Ns / 10000000;
     req.tv_nsec = (delayIn100Ns % 10000000) * 100;

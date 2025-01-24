@@ -8,13 +8,17 @@
 #include <thread>
 #include <windows.h>
 
-#ifndef ntohl
-#define ntohl(x) ((uint32_t)((((x) & 0xFF) << 24) | (((x) & 0xFF00) << 8) | (((x) & 0xFF0000) >> 8) | (((x) >> 24) & 0xFF)))
-#endif
+uint32_t fntohl(uint32_t nlong) {
+    return ((nlong & 0xFF000000) >> 24) |
+           ((nlong & 0x00FF0000) >> 8)  |
+           ((nlong & 0x0000FF00) << 8)  |
+           ((nlong & 0x000000FF) << 24);
+}
 
-#ifndef ntohs
-#define ntohs(x) ((uint16_t)((((x) & 0xFF) << 8) | (((x) & 0xFF00) >> 8)))
-#endif
+uint16_t fntohs(uint16_t nshort) {
+    return ((nshort & 0xFF00) >> 8) |
+           ((nshort & 0x00FF) << 8);
+}
 
 class Track
 {
@@ -103,22 +107,6 @@ public:
         message |= temp;
     }
 };
-
-// Bad
-// void delayExecution100Ns(const int64_t delayIn100Ns) {
-//     using namespace std::chrono;
-//     const auto delayDuration = duration<int64_t, std::ratio<1, 10000000>>(delayIn100Ns);
-//     std::this_thread::sleep_for(delayDuration);
-// }
-
-// void busyWait100Ns(const int64_t delayIn100Ns) {
-//     using namespace std::chrono;
-//     const auto start = high_resolution_clock::now();
-//     const auto end = start + duration<int64_t, std::ratio<1, 10000000>>(delayIn100Ns);
-//     while (high_resolution_clock::now() < end) {
-//         // Spin-wait
-//     }
-// }
 
 #if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
@@ -219,7 +207,7 @@ public:
 
         uint32_t header_length;
         file.read(reinterpret_cast<char *>(&header_length), 4);
-        header_length = ntohl(header_length);
+        header_length = fntohl(header_length);
         if (header_length != 6)
         {
             throw std::runtime_error("Invalid header length");
@@ -227,14 +215,14 @@ public:
 
         uint16_t format;
         file.read(reinterpret_cast<char *>(&format), 2);
-        format = ntohs(format);
+        format = fntohs(format);
 
         uint16_t track_count;
         file.read(reinterpret_cast<char *>(&track_count), 2);
-        track_count = ntohs(track_count);
+        track_count = fntohs(track_count);
 
         file.read(reinterpret_cast<char *>(&time_div), 2);
-        time_div = ntohs(time_div);
+        time_div = fntohs(time_div);
 
         if (time_div >= 0x8000)
         {
@@ -253,7 +241,7 @@ public:
 
             uint32_t length;
             file.read(reinterpret_cast<char *>(&length), 4);
-            length = ntohl(length);
+            length = fntohl(length);
 
             std::vector<uint8_t> track_data(length);
             file.read(reinterpret_cast<char *>(track_data.data()), length);
